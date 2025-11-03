@@ -7,11 +7,11 @@ echo Building OpenKeyScan Tagger Standalone Application
 echo ======================================================================
 echo.
 
-REM Check if pyinstaller is available
-where pyinstaller >nul 2>nul
+REM Check if pipenv is available
+where pipenv >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
-    echo Error: pyinstaller not found
-    echo Install it with: pipenv install --dev
+    echo Error: pipenv not found
+    echo Install it with: pip install pipenv
     exit /b 1
 )
 
@@ -24,8 +24,8 @@ if exist "build" (
 echo Starting PyInstaller build...
 echo.
 
-REM Run PyInstaller with --noconfirm to skip prompts
-pyinstaller --noconfirm openkeyscan_tagger.spec
+REM Run PyInstaller with --noconfirm to skip prompts using pipenv
+pipenv run pyinstaller --noconfirm openkeyscan_tagger.spec
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
@@ -51,7 +51,7 @@ echo Or extract and distribute the zip file:
 echo   dist\openkeyscan-tagger.zip
 echo.
 
-set DEST_DIR=%USERPROFILE%\openkeyscan\build\lib\windows\x64
+set DEST_DIR=%USERPROFILE%\workspace\openkeyscan\build\lib\windows\x64
 
 echo ======================================================================
 echo Moving build to library directory
