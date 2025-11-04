@@ -95,8 +95,8 @@ def write_key_to_file(file_path, key_value):
             sync_file(file_path)
             return True, None, 'aac'
 
-        # MP4/M4A files - use freeform tags
-        elif file_ext in ['.mp4', '.m4a']:
+        # MP4/M4A/ALAC files - use freeform tags
+        elif file_ext in ['.mp4', '.m4a', '.alac']:
             audio = MP4(file_path)
             # Use freeform ----:com.apple.iTunes:KEY tag
             audio['----:com.apple.iTunes:KEY'] = key_value.encode('utf-8')
@@ -120,8 +120,8 @@ def write_key_to_file(file_path, key_value):
             sync_file(file_path)
             return True, None, 'ogg'
 
-        # AIFF/AIF/ALAC files - use ID3 tags
-        elif file_ext in ['.aiff', '.aif', '.alac']:
+        # AIFF/AIF files - use ID3 tags
+        elif file_ext in ['.aiff', '.aif']:
             audio = AIFF(file_path)
             if audio.tags is None:
                 audio.add_tags()
