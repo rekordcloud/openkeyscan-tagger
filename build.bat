@@ -51,7 +51,7 @@ echo Or extract and distribute the zip file:
 echo   dist\openkeyscan-tagger.zip
 echo.
 
-set DEST_DIR=%USERPROFILE%\workspace\openkeyscan\build\lib\windows\x64
+set DEST_DIR=%USERPROFILE%\workspace\openkeyscan\OpenKeyScan-app\build\lib\win\x64
 
 echo ======================================================================
 echo Moving build to library directory
