@@ -267,11 +267,13 @@ def codesign_macos(dist_path):
 
     print("")
 
-    # PHASE 4: Sign the main executable
-    print("Phase 4: Signing main executable...")
+    # PHASE 4: Sign the main executable (with entitlements for Python libraries)
+    print("Phase 4: Signing main executable with entitlements...")
     main_exe = dist_path / 'openkeyscan-tagger'
+    entitlements_file = base_path / 'analyzer.entitlements'
     if main_exe.exists():
-        sign_file(main_exe)
+        # Sign with entitlements to allow JIT, unsigned executable memory, etc.
+        sign_file(main_exe, options=['--entitlements', str(entitlements_file)])
 
     print("")
     print(f"Signing complete:")
