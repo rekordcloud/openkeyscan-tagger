@@ -82,7 +82,7 @@ echo "  dist/openkeyscan-tagger.zip"
 echo ""
 
 # Move zip file to distribution directory
-DEST_DIR="$HOME/workspace/openkeyscan/build/lib/mac/$ARCH_DIR"
+DEST_DIR="$HOME/workspace/openkeyscan/openkeyscan-app/build/lib/mac/$ARCH_DIR"
 ZIP_FILE="dist/openkeyscan-tagger.zip"
 
 echo "======================================================================"
