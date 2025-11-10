@@ -42,19 +42,15 @@ echo ======================================================================
 echo.
 echo Output:
 echo   Executable: dist\openkeyscan-tagger\openkeyscan-tagger.exe
-echo   Archive:    dist\openkeyscan-tagger.zip
 echo.
 echo Test the build:
 echo   dist\openkeyscan-tagger\openkeyscan-tagger.exe
-echo.
-echo Or extract and distribute the zip file:
-echo   dist\openkeyscan-tagger.zip
 echo.
 
 set DEST_DIR=%USERPROFILE%\workspace\openkeyscan\OpenKeyScan-app\build\lib\win\x64
 
 echo ======================================================================
-echo Moving build to library directory
+echo Installing to distribution directory
 echo ======================================================================
 echo.
 echo Architecture: x64
@@ -64,10 +60,22 @@ echo.
 REM Create destination directory if it doesn't exist
 if not exist "%DEST_DIR%" mkdir "%DEST_DIR%"
 
-REM Copy the zip file to the destination, replacing any existing file
-copy /Y dist\openkeyscan-tagger.zip "%DEST_DIR%\"
+REM Remove existing build folder if it exists
+if exist "%DEST_DIR%\openkeyscan-tagger" (
+    echo Removing existing build...
+    rmdir /s /q "%DEST_DIR%\openkeyscan-tagger"
+)
+
+REM Copy the build folder to the destination
+echo Copying build to distribution directory...
+xcopy /E /I /Y dist\openkeyscan-tagger "%DEST_DIR%\openkeyscan-tagger"
+echo [+] Copied to: %DEST_DIR%\openkeyscan-tagger
 
 echo.
-echo Build successfully moved to:
-echo   %DEST_DIR%\openkeyscan-tagger.zip
+echo ======================================================================
+echo Installation Complete!
+echo ======================================================================
+echo.
+echo Distribution location:
+echo   %DEST_DIR%\openkeyscan-tagger\
 echo.
