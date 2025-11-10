@@ -67,6 +67,20 @@ pipenv run pyinstaller --noconfirm openkeyscan_tagger.spec
 
 echo ""
 echo "======================================================================"
+echo "Post-build: Packaging"
+echo "======================================================================"
+echo ""
+
+# Create ZIP archive using ditto (preserves code signatures)
+echo "Creating distribution archive..."
+if [ -f "dist/openkeyscan-tagger.zip" ]; then
+    rm dist/openkeyscan-tagger.zip
+fi
+ditto -c -k --keepParent dist/openkeyscan-tagger dist/openkeyscan-tagger.zip
+echo "✓ Created: dist/openkeyscan-tagger.zip"
+
+echo ""
+echo "======================================================================"
 echo "Build Complete!"
 echo "======================================================================"
 echo ""
@@ -74,35 +88,53 @@ echo "Output:"
 echo "  Executable: dist/openkeyscan-tagger/openkeyscan-tagger"
 echo "  Archive:    dist/openkeyscan-tagger.zip"
 echo ""
-echo "Test the build:"
-echo "  ./dist/openkeyscan-tagger/openkeyscan-tagger"
-echo ""
-echo "Or extract and distribute the zip file:"
-echo "  dist/openkeyscan-tagger.zip"
-echo ""
 
-# Move zip file to distribution directory
+# Copy to distribution directory and clean up Python.framework
 DEST_DIR="$HOME/workspace/openkeyscan/openkeyscan-app/build/lib/mac/$ARCH_DIR"
 ZIP_FILE="dist/openkeyscan-tagger.zip"
 
-echo "======================================================================"
-echo "Moving build to library directory"
-echo "======================================================================"
-echo ""
-echo "Architecture: $ARCH_DIR"
-echo "Destination:  $DEST_DIR"
+echo "Installing to distribution directory..."
+echo "  Architecture: $ARCH_DIR"
+echo "  Destination:  $DEST_DIR"
 echo ""
 
 # Create destination directory if it doesn't exist
 mkdir -p "$DEST_DIR"
 
-# Move the zip file to the destination, replacing any existing file
+# Copy the build folder to distribution directory first
+echo "Copying build to distribution directory..."
+rm -rf "$DEST_DIR/openkeyscan-tagger"
+cp -r dist/openkeyscan-tagger "$DEST_DIR/"
+echo "✓ Copied to: $DEST_DIR/openkeyscan-tagger"
+echo ""
+
+# Delete Python.framework from the distribution copy (causes signing issues, not needed)
+echo "Removing Python.framework from distribution..."
+if [ -d "$DEST_DIR/openkeyscan-tagger/_internal/Python.framework" ]; then
+    rm -rf "$DEST_DIR/openkeyscan-tagger/_internal/Python.framework"
+    echo "✓ Removed Python.framework"
+else
+    echo "  (Python.framework not found, skipping)"
+fi
+echo ""
+
+# Copy the zip file
 if [ -f "$ZIP_FILE" ]; then
-    cp -f "$ZIP_FILE" "$DEST_DIR/"
-    echo "✓ Build successfully moved to:"
-    echo "  $DEST_DIR/openkeyscan-tagger.zip"
+    cp "$ZIP_FILE" "$DEST_DIR/openkeyscan-tagger.zip"
+    echo "✓ Installed: $DEST_DIR/openkeyscan-tagger.zip"
 else
     echo "Error: ZIP file not found at $ZIP_FILE"
     exit 1
 fi
+
+echo ""
+echo "======================================================================"
+echo "Installation Complete!"
+echo "======================================================================"
+echo ""
+echo "Test the build:"
+echo "  ./dist/openkeyscan-tagger/openkeyscan-tagger"
+echo ""
+echo "Distribution package:"
+echo "  $DEST_DIR/openkeyscan-tagger.zip"
 echo ""
