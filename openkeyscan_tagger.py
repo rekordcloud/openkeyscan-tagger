@@ -8,10 +8,12 @@ Communicates via line-delimited JSON (NDJSON) protocol.
 Protocol:
   Write Request:  {"id": "uuid", "path": "/absolute/path/file.mp3", "key": "9A"}
   Read Request:    {"id": "uuid", "path": "/absolute/path/file.mp3"}
-  Success:         {"id": "uuid", "status": "success", "key": "9A", "filename": "file.mp3", "format": "mp3"}
+  Success:         {"id": "uuid", "status": "success", "key": "9A", "filename": "file.mp3", "format": "mp3", "albumArtPath": "/tmp/openkeyscan-art-uuid.jpg"}
   Error:           {"id": "uuid", "status": "error", "error": "Error message", "filename": "file.mp3"}
   Ready:           {"type": "ready"}
   Heartbeat:       {"type": "heartbeat"}
+
+Note: albumArtPath is optional and only included if album art is found in the file.
 
 Note: If "key" field is missing or empty, the request is treated as a read operation.
 """
@@ -21,12 +23,14 @@ import os
 import json
 import threading
 import time
+import tempfile
+import uuid
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 # Import mutagen for audio tagging
 from mutagen import File
-from mutagen.id3 import ID3, TKEY, ID3NoHeaderError
+from mutagen.id3 import ID3, TKEY, APIC, ID3NoHeaderError
 from mutagen.mp4 import MP4
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
@@ -105,6 +109,124 @@ def get_mp4_field_case_insensitive(audio, field_name):
                 value = value_list[0]
                 return value.decode('utf-8') if isinstance(value, bytes) else str(value)
     return None
+
+
+def extract_album_art(file_path):
+    """
+    Extract album art from an audio file and save to a temporary file.
+
+    Args:
+        file_path (Path): Path to audio file
+
+    Returns:
+        str or None: Path to temporary file containing album art, or None if not found
+    """
+    try:
+        file_ext = file_path.suffix.lower()
+        image_data = None
+        mime_type = None
+
+        # MP3 files - read APIC frame
+        if file_ext in ['.mp3', '.aac']:
+            try:
+                audio = ID3(file_path)
+                # Get first picture frame (usually front cover)
+                for tag in audio.values():
+                    if isinstance(tag, APIC):
+                        image_data = tag.data
+                        mime_type = tag.mime
+                        break
+            except ID3NoHeaderError:
+                pass
+
+        # MP4/M4A/ALAC files - read covr atom
+        elif file_ext in ['.mp4', '.m4a', '.alac']:
+            audio = MP4(file_path)
+            if 'covr' in audio and len(audio['covr']) > 0:
+                cover = audio['covr'][0]
+                image_data = bytes(cover)
+                # MP4 covers are typically JPEG or PNG
+                # Try to detect type from magic bytes
+                if image_data[:4] == b'\xff\xd8\xff\xe0' or image_data[:2] == b'\xff\xd8':
+                    mime_type = 'image/jpeg'
+                elif image_data[:8] == b'\x89PNG\r\n\x1a\n':
+                    mime_type = 'image/png'
+                else:
+                    mime_type = 'image/jpeg'  # Default to JPEG
+
+        # FLAC files - read Picture block
+        elif file_ext == '.flac':
+            audio = FLAC(file_path)
+            if audio.pictures and len(audio.pictures) > 0:
+                picture = audio.pictures[0]
+                image_data = picture.data
+                mime_type = picture.mime
+
+        # OGG Vorbis files - read embedded pictures (Vorbis comments)
+        elif file_ext == '.ogg':
+            audio = OggVorbis(file_path)
+            # OGG can have METADATA_BLOCK_PICTURE in Vorbis comments
+            # This is base64-encoded FLAC picture block
+            if 'metadata_block_picture' in audio:
+                import base64
+                picture_data = base64.b64decode(audio['metadata_block_picture'][0])
+                # Parse FLAC picture block
+                # Skip the picture type (4 bytes) and mime length (4 bytes)
+                mime_len = int.from_bytes(picture_data[4:8], 'big')
+                mime_type = picture_data[8:8+mime_len].decode('ascii')
+                # Skip description and other metadata to get to image data
+                # This is complex, so we'll use mutagen's built-in parsing
+                from mutagen.flac import Picture
+                picture = Picture(picture_data)
+                image_data = picture.data
+                mime_type = picture.mime
+
+        # AIFF/AIF files - read ID3 tags with APIC
+        elif file_ext in ['.aiff', '.aif']:
+            audio = AIFF(file_path)
+            if audio.tags:
+                for tag in audio.tags.values():
+                    if isinstance(tag, APIC):
+                        image_data = tag.data
+                        mime_type = tag.mime
+                        break
+
+        # WAV files - read ID3 tags with APIC
+        elif file_ext == '.wav':
+            audio = WAVE(file_path)
+            if audio.tags:
+                for tag in audio.tags.values():
+                    if isinstance(tag, APIC):
+                        image_data = tag.data
+                        mime_type = tag.mime
+                        break
+
+        # If we found image data, write to temp file
+        if image_data:
+            # Determine file extension from MIME type
+            if mime_type == 'image/png':
+                ext = '.png'
+            elif mime_type in ['image/jpeg', 'image/jpg']:
+                ext = '.jpg'
+            else:
+                ext = '.jpg'  # Default to JPEG
+
+            # Create temp file with unique name
+            temp_id = str(uuid.uuid4())
+            temp_path = os.path.join(tempfile.gettempdir(), f'openkeyscan-art-{temp_id}{ext}')
+
+            # Write image data
+            with open(temp_path, 'wb') as f:
+                f.write(image_data)
+
+            return temp_path
+
+        return None
+
+    except Exception as e:
+        # Album art extraction is optional, don't fail the whole request
+        print(f"Warning: Failed to extract album art: {e}", file=sys.stderr)
+        return None
 
 
 def read_key_from_file(file_path):
@@ -368,13 +490,22 @@ class KeyTaggingServer:
                 success, read_key, format_type, error_msg = read_key_from_file(audio_path)
 
                 if success:
-                    return {
+                    # Extract album art if present
+                    album_art_path = extract_album_art(audio_path)
+
+                    response = {
                         'id': request_id,
                         'status': 'success',
                         'key': read_key,
                         'filename': audio_path.name,
                         'format': format_type
                     }
+
+                    # Add album art path if extracted
+                    if album_art_path:
+                        response['albumArtPath'] = album_art_path
+
+                    return response
                 else:
                     return {
                         'id': request_id,
